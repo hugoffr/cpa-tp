@@ -1,7 +1,36 @@
-<!DOCTYPE html>
-<html  lang="pt" xml:lang="pt">
-<head>
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+#include <iostream>
+#include <iomanip>
+#include <math.h>
 
-<title>Redirecionar</title>
-</head><body><div style="margin-top: 3em; margin-left:auto; margin-right:auto; text-align:center;">Esta página deverá redirecionar automaticamente. Se tal não acontecer, use a hiperligação abaixo para continuar.<br /><a href="https://moodle.up.pt/enrol/index.php?id=4798">Continuar</a></div></body></html>
+using namespace std;
+
+int main (int argc, char *argv[])
+{
+    long long n;
+    
+    cout << "Power of 10: ";
+    cin >> n;
+ 
+    n = pow(10,n);
+    
+    bool *primes = new bool[n];
+    
+    long long k = 3;
+
+    do
+    {
+        for (long long j = k*k ; j<n ; j+=2*k)
+        {   primes[j>>1]=true;
+        }
+        
+        do
+        {
+            k+=2;
+        }while (k*k <= n && primes[k>>1]);
+        
+    } while (k*k <= n);
+    
+    for (int i=1; i<n; i+=2)
+        if (!primes[i>>1])
+            cout << i << " ";
+}
