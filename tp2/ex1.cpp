@@ -33,9 +33,10 @@ void f1(bool *primes, long long n)
     do
     {
         // Mark all multiples of k between k^2 and n
-        for (long long j = 2*k; j<n; j++)
+        // by dividing each element by k and checking if the ramainder is 0
+        for (long long j = k*k; j<=n; j++)
         {
-            if (j%k == 0) 
+            if (j % k == 0) 
             {
                 primes[j] = true;
             }
@@ -56,19 +57,17 @@ void f2(bool *primes, long long n)
     do
     {
         // Mark all multiples of k between k^2 and n
-        for (long long j = k; j*k<=n; j++)
+        // by fast-marking all values that are computed
+        for (long long j = k*k; j<=n; j+=k)
         {
-            if ( j%k*j == 0) 
-            {
-                primes[j*k] = true;
-            }
+                primes[j] = true;
         }
         
         // Smallest unmarked number becomes K
         do
         {
             k+=2;
-        } while (k*k <= n && primes[k>>1]);
+        } while (k*k <= n && primes[k]);
         
     } while (k*k <= n); 
 }
@@ -106,6 +105,7 @@ int main (int argc, char *argv[])
     bool *primes = new bool[n];
 
     Time1 = clock();
+
     switch (op)
     {
         case 0:
@@ -131,7 +131,16 @@ int main (int argc, char *argv[])
     sprintf(st, "Time: %3.3f seconds\n", (double)(Time2 - Time1) / CLOCKS_PER_SEC);
     cout << st;
     
-    for (int i=1; i<n; i+=2)
-        if (!primes[i>>1])
-            cout << i << " ";
+    if (op == 0)
+    {
+        for (int i=1; i<n; i+=2)
+            if (!primes[i>>1])
+                cout << i << " ";
+    }
+    else
+    {
+        for (int i=1; i<n; i+=2)
+            if (!primes[i])
+                cout << i << " ";
+    }
 }
