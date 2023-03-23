@@ -7,8 +7,10 @@ using namespace std;
 
 #define SYSTEMTIME clock_t
 
-void f0(bool *primes, long long k, long long n)
+void f0(bool *primes, long long n)
 {
+    long long k = 3;
+
     do
     {
         for (long long j = k*k ; j<n ; j+=2*k)
@@ -16,7 +18,6 @@ void f0(bool *primes, long long k, long long n)
             primes[j>>1]=true;
         }
         
-        // K goes up to the next, skipping one because even numbers are never prime
         do
         {
             k+=2;
@@ -25,17 +26,54 @@ void f0(bool *primes, long long k, long long n)
     } while (k*k <= n);
 }
 
-void f1(bool *primes, long long k, long long n)
+void f1(bool *primes, long long n)
 {
+    long long k = 3;
 
+    do
+    {
+        // Mark all multiples of k between k^2 and n
+        for (long long j = 2*k; j<n; j++)
+        {
+            if (j%k == 0) 
+            {
+                primes[j] = true;
+            }
+        }
+        
+        // Smallest unmarked number becomes K
+        do
+        {
+            k+=2;
+        } while (k*k <= n && primes[k]);
+        
+    } while (k*k <= n); 
 }
 
-void f2(bool *primes, long long k, long long n)
+void f2(bool *primes, long long n)
 {
-
+    long long k = 3;
+    do
+    {
+        // Mark all multiples of k between k^2 and n
+        for (long long j = k; j*k<=n; j++)
+        {
+            if ( j%k*j == 0) 
+            {
+                primes[j*k] = true;
+            }
+        }
+        
+        // Smallest unmarked number becomes K
+        do
+        {
+            k+=2;
+        } while (k*k <= n && primes[k>>1]);
+        
+    } while (k*k <= n); 
 }
 
-void f3(bool *primes, long long k, long long n)
+void f3(bool *primes, long long n)
 {
     
 }
@@ -54,7 +92,7 @@ int main (int argc, char *argv[])
 
     do
     {
-        cout << endl << "Which function method be used?" << endl;
+        cout << endl << "Which function method should be used?" << endl;
         cout << "0. Premade (Teacher's Code)" << endl;
         cout << "1. First" << endl;
         cout << "2. Second" << endl;
@@ -66,23 +104,21 @@ int main (int argc, char *argv[])
     n = pow(2,n);
     
     bool *primes = new bool[n];
-    
-    long long k = 3;
 
     Time1 = clock();
     switch (op)
     {
         case 0:
-            f0(primes, k, n);
+            f0(primes, n);
             break;
         case 1:
-            f1(primes, k, n);
+            f1(primes, n);
             break;
         case 2:
-            f2(primes, k, n);
+            f2(primes, n);
             break;
         case 3:
-            f3(primes, k, n);
+            f3(primes, n);
             break;
         default:
             cout << endl << "Something went wrong." << endl;
@@ -95,9 +131,7 @@ int main (int argc, char *argv[])
     sprintf(st, "Time: %3.3f seconds\n", (double)(Time2 - Time1) / CLOCKS_PER_SEC);
     cout << st;
     
-    /*
     for (int i=1; i<n; i+=2)
         if (!primes[i>>1])
             cout << i << " ";
-    */
 }
