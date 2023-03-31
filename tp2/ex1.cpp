@@ -8,7 +8,7 @@ using namespace std;
 
 #define SYSTEMTIME clock_t
 
-void f0(bool *primes, long long n)
+void f0 (bool *primes, long long n)
 {
     long long k = 3;
 
@@ -27,7 +27,7 @@ void f0(bool *primes, long long n)
     } while (k*k <= n);
 }
 
-void f1(bool *primes, long long n)
+void f1 (bool *primes, long long n)
 {
     long long k = 3;
 
@@ -52,7 +52,7 @@ void f1(bool *primes, long long n)
     } while (k*k <= n); 
 }
 
-void f2(bool *primes, long long n)
+void f2 (bool *primes, long long n)
 {
     long long k = 3;
     do
@@ -73,9 +73,8 @@ void f2(bool *primes, long long n)
     } while (k*k <= n); 
 }
 
-void f3(bool *primes, long long n)
+void f3 (bool *primes, long long n)
 {
-    long long k = 3;
     int cacheBlockSize = 65536; //my L1 cache has 256kiB, we are setting this to 64kiB
     long long seedList[(int)(sqrt(n)+1)] = {}; //List to store the seeds
     long long foundSeeds = 0; //How many seeds have been found so far
@@ -93,7 +92,7 @@ void f3(bool *primes, long long n)
             blockEnd = n+1;
         }
 
-        for(long long seed_i = 0; seed_i < foundSeeds; seed_i++)
+        for (long long seed_i = 0; seed_i < foundSeeds; seed_i++)
         {
             long long seed = seedList[seed_i];
             //Lets say we are in block starting in 100 000 and we are testing the seed 7. We can start at 0 and add 7 until we reach 100 000 or we can divide 100 000 by 7,
@@ -111,7 +110,7 @@ void f3(bool *primes, long long n)
                 markingStart = squaredSeed;
             }
 
-            long long j = (int)(ceil(blockStart/((double)seed)) * seed);
+            long long j = (long long)(ceil(blockStart/((double)seed)) * seed);
 
             while (j < blockEnd)
             {
@@ -120,19 +119,19 @@ void f3(bool *primes, long long n)
             }
         }
 
-        if(allSeedsFound) //Check if there are still seeds to find
+        if (allSeedsFound) //Check if there are still seeds to find
         {
             continue;
         }
 
         long long k = blockStart;
 
-        if(k == 0)
+        if (k == 0)
         {
             k = 3;
         }
 
-        while(primes[k] && k < blockEnd) //Find first unmarked number
+        while (primes[k] && k < blockEnd) //Find first unmarked number
         {
             k++;
         }
@@ -170,9 +169,8 @@ void f3(bool *primes, long long n)
     }
 }
 
-void f4(bool *primes, long long n)
+void f4 (bool *primes, long long n)
 {
-    long long k = 3;
     int cacheBlockSize = 65536; //my L1 cache has 256kiB, we are setting this to 64kiB
     long long seedList[(int)(sqrt(n)+1)] = {}; //List to store the seeds
     long long foundSeeds = 0; //How many seeds have been found so far
@@ -180,7 +178,7 @@ void f4(bool *primes, long long n)
     long long blockNumber = n / cacheBlockSize + 1; //In how many blocks we will divide data
     bool allSeedsFound = false; //Wether all seeds have been found or not
 
-    #pragma omp parallel for
+    #pragma omp parallel
     for(long long block = 0; block < blockNumber; block++)
     {
         //First test seeds already found
@@ -191,7 +189,8 @@ void f4(bool *primes, long long n)
             blockEnd = n+1;
         }
 
-        for(long long seed_i = 0; seed_i < foundSeeds; seed_i++)
+        #pragma omp single
+        for (long long seed_i = 0; seed_i < foundSeeds; seed_i++)
         {
             long long seed = seedList[seed_i];
             //Lets say we are in block starting in 100 000 and we are testing the seed 7. We can start at 0 and add 7 until we reach 100 000 or we can divide 100 000 by 7,
@@ -209,7 +208,7 @@ void f4(bool *primes, long long n)
                 markingStart = squaredSeed;
             }
 
-            long long j = (int)(ceil(blockStart/((double)seed)) * seed);
+            long long j = (long long)(ceil(blockStart/((double)seed)) * seed);
 
             while (j < blockEnd)
             {
@@ -218,19 +217,19 @@ void f4(bool *primes, long long n)
             }
         }
 
-        if(allSeedsFound) //Check if there are still seeds to find
+        if (allSeedsFound) //Check if there are still seeds to find
         {
             continue;
         }
 
         long long k = blockStart;
 
-        if(k == 0)
+        if (k == 0)
         {
             k = 3;
         }
 
-        while(primes[k] && k < blockEnd) //Find first unmarked number
+        while (primes[k] && k < blockEnd) //Find first unmarked number
         {
             k++;
         }
@@ -239,7 +238,8 @@ void f4(bool *primes, long long n)
         {
             continue;
         }
-
+        
+        #pragma omp parallel
         do
         {
             seedList[foundSeeds] = k;
@@ -260,11 +260,12 @@ void f4(bool *primes, long long n)
             } while (k*k <= n && primes[k]);
             
         } while (k*k < blockEnd);
-        
+
         if (k*k <= n)
         {
             allSeedsFound = true;
-        } 
+        }
+        #pragma omp barrier
     }
 }
 
