@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <papi.h>
 
 void lu_factorization(double** A, int n) {
     int i, j, k;
@@ -82,7 +83,35 @@ void print_results(double** A, double* b, double* x, int n) {
 
 void sequential_solution(int n) {
 
+    //---------------------------------------------------------
+    // Initialize Counters
+
+    int ret, EventSet;
+
+    long long values[4];
+
     clock_t tic, toc;
+
+    ret = PAPI_library_init(PAPI_VER_CURRENT);
+    if (ret != PAPI_VER_CURRENT) printf("FAIL\n");
+
+    ret = PAPI_create_eventset(&EventSet);
+    if (ret != PAPI_OK) printf("ERRO: create eventset\n");
+
+    ret = PAPI_add_event(EventSet, PAPI_L1_DCM);
+    if (ret != PAPI_OK) printf("ERRO: PAPI_L1_DCM\n");
+
+    ret = PAPI_add_event(EventSet, PAPI_L2_DCM);
+    if (ret != PAPI_OK) printf("ERRO: PAPI_L2_DCM\n");
+
+    ret = PAPI_add_event(EventSet, PAPI_FP_INS);
+    if (ret != PAPI_OK) printf("ERRO: PAPI_FP_INS\n");
+
+    ret = PAPI_add_event(EventSet, PAPI_TOT_INS);
+    if (ret != PAPI_OK) printf("ERRO: PAPI_TOT_INS\n");
+
+    //
+    //---------------------------------------------------------
 
     double** A = (double**) malloc(n * sizeof(double*));
     double* b = (double*) malloc(n * sizeof(double));
@@ -94,7 +123,14 @@ void sequential_solution(int n) {
 
     init_matrix_and_vector(A, b, n);
 
+    //---------------------------------------------------------
+    // Start Counting
     tic = clock();
+
+    ret = PAPI_start(EventSet);
+    if (ret != PAPI_OK) printf("ERRO: Start PAPI\n");
+    //
+    //---------------------------------------------------------
     
     // Perform LU factorization
     lu_factorization(A, n);
@@ -102,9 +138,40 @@ void sequential_solution(int n) {
     // Solve for x
     solve_lu(A, b, x, n);
 
+    //---------------------------------------------------------
+    // Stop Counting
     toc = clock();
 
+    ret = PAPI_stop(EventSet, values);
+    if (ret != PAPI_OK) printf("ERRO: Stop PAPI\n");
+    printf("L1 DCM: %lld \n",values[0]);
+    printf("L2 DCM: %lld \n",values[1]);
+    printf("Flops: %lld \n",values[2]);
+    printf("Total Instructions: %lld \n",values[3]);
+
+    ret = PAPI_reset( EventSet );
+    if ( ret != PAPI_OK ) printf("FAIL reset\n"); 
+
     printf("Sequential time for %d: %3.6f\n", n,(double)(toc - tic) / CLOCKS_PER_SEC);
+
+    ret = PAPI_remove_event( EventSet, PAPI_L1_DCM );
+    if ( ret != PAPI_OK ) printf("FAIL remove event\n"); 
+
+    ret = PAPI_remove_event( EventSet, PAPI_L2_DCM );
+    if ( ret != PAPI_OK ) printf( "FAIL remove event\n");
+
+    ret = PAPI_remove_event( EventSet, PAPI_FP_INS );
+    if ( ret != PAPI_OK ) printf( "FAIL remove event\n"); 
+
+    ret = PAPI_remove_event( EventSet, PAPI_TOT_INS );
+    if ( ret != PAPI_OK ) printf( "FAIL remove event\n"); 
+
+    ret = PAPI_destroy_eventset( &EventSet );
+    if ( ret != PAPI_OK ) printf("FAIL destroy\n");
+
+    //
+    //---------------------------------------------------------
+
 }
 
 int main() {
