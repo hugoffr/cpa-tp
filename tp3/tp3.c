@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <omp.h>    
 
 
 /*
@@ -158,6 +159,178 @@ void block_lu_factorization(double** A, int n, int block_size){
     }
 }
 
+void parallel_block_lu_factorization(double** A, int n, int block_size){
+
+    if (block_size > n){
+        lu_factorization(A, n);
+        return;
+    }
+    double pivot_block_time,vertical_block_time,horizontal_block_time,rest_block_time;
+    int pivot_block_count,vertical_block_count,horizontal_block_count,rest_block_count;
+    //For each pivot block
+    for (int pivot_block = 0; pivot_block < n/block_size; pivot_block++){
+        //For each pivot inside a pivot block
+        for (int pivot_i = 0; pivot_i < block_size; pivot_i++){
+
+            double start_time,end_time;
+            start_time = omp_get_wtime();
+            double pivot = A[pivot_block*block_size+pivot_i][pivot_block*block_size+pivot_i];
+            //Divide left column by pivot
+            for (int left_column_i = pivot_block*block_size+pivot_i; left_column_i < (pivot_block+1)*block_size; left_column_i++){
+                A[left_column_i][pivot_block * block_size + pivot_i] /= pivot;
+            }
+            //Update all remainig values
+            for (int inner_mat_x = pivot_block*block_size+pivot_i+1; inner_mat_x < (pivot_block+1) * block_size; inner_mat_x++){
+                for (int inner_mat_y = pivot_block*block_size+pivot_i+1; inner_mat_y < (pivot_block+1) * block_size; inner_mat_y++){
+                    A[inner_mat_x][inner_mat_y] -= A[inner_mat_x][pivot_block*block_size+pivot_i] * A[pivot_block*block_size+pivot_i][inner_mat_y];
+                }
+            }
+            end_time = omp_get_wtime();
+            pivot_block_time += (end_time-start_time);
+            pivot_block_count++;
+            //For each vertical block under the current pivot block
+            #pragma omp parallel for
+            for(int v_block_i = pivot_block + 1 ; v_block_i < n/block_size;v_block_i ++){
+                start_time = omp_get_wtime();
+                //Divide left column by pivot
+                for (int left_column_i = 0; left_column_i < block_size; left_column_i++){
+                    A[v_block_i*block_size+left_column_i][pivot_block*block_size+pivot_i] /= pivot;
+                }
+                //Update all remainig values
+                for (int inner_mat_x = pivot_block*block_size+pivot_i+1; inner_mat_x < (pivot_block+1) * block_size; inner_mat_x++){
+                    for (int inner_mat_y = v_block_i*block_size; inner_mat_y < (v_block_i+1) * block_size; inner_mat_y++){
+                        A[inner_mat_y][inner_mat_x] -= A[inner_mat_y][pivot_block*block_size+pivot_i] * A[pivot_block*block_size+pivot_i][inner_mat_x];
+                    }
+                }
+                end_time = omp_get_wtime();
+                vertical_block_time += (end_time - start_time);
+                vertical_block_count++;
+            }
+            //For each horizontal block to the right of the pivot block
+            #pragma omp parallel for
+            for(int h_block_i = pivot_block + 1 ; h_block_i < n/block_size;h_block_i ++){
+                start_time = omp_get_wtime();
+                //Update all remainig values
+                for (int inner_mat_x = (h_block_i+pivot_block)*block_size; inner_mat_x < (pivot_block + h_block_i+1) * block_size; inner_mat_x++){
+                    for (int inner_mat_y = pivot_block*block_size+pivot_i+1; inner_mat_y < (pivot_block+1) * block_size; inner_mat_y++){
+                        A[inner_mat_y][inner_mat_x] -= A[inner_mat_y][pivot_block*block_size+pivot_i] * A[pivot_block*block_size+pivot_i][inner_mat_x];
+                    }
+                }
+                
+                end_time = omp_get_wtime();
+                horizontal_block_time += (end_time - start_time);
+                horizontal_block_count++;
+            }
+            //Update other blocks
+            #pragma omp parallel for
+            for(int h_block_i = pivot_block+1;h_block_i < n/block_size;h_block_i ++){
+                for(int v_block_i = pivot_block+1;v_block_i < n/block_size;v_block_i ++){
+                    start_time = omp_get_wtime();
+                    for (int inner_mat_x = (h_block_i)*block_size; inner_mat_x < (h_block_i+1) * block_size; inner_mat_x++){
+                        for (int inner_mat_y = v_block_i*block_size; inner_mat_y < (v_block_i+1) * block_size; inner_mat_y++){
+                            A[inner_mat_y][inner_mat_x] -= A[inner_mat_y][pivot_block*block_size+pivot_i] * A[pivot_block*block_size+pivot_i][inner_mat_x];
+                        }
+                    }
+                    end_time = omp_get_wtime();
+                    rest_block_time += (end_time - start_time);
+                    rest_block_count++;
+                }
+            }
+        }
+    }
+    printf("Average pivot block time:      %f\n",pivot_block_time/pivot_block_count);
+    printf("Average vertical block time:   %f\n",vertical_block_time/vertical_block_count);
+    printf("Average horizontal block time: %f\n",horizontal_block_time/horizontal_block_count);
+    printf("Average rest block time:       %f\n",rest_block_time/rest_block_count);
+}
+
+void distributed_block_lu_factorization(double** A, int n, int block_size){
+
+    if (block_size > n){
+        lu_factorization(A, n);
+        return;
+    }
+    double pivot_block_time,vertical_block_time,horizontal_block_time,rest_block_time;
+    int pivot_block_count,vertical_block_count,horizontal_block_count,rest_block_count;
+    //For each pivot block
+    for (int pivot_block = 0; pivot_block < n/block_size; pivot_block++){
+        //For each pivot inside a pivot block
+        for (int pivot_i = 0; pivot_i < block_size; pivot_i++){
+
+            double start_time,end_time;
+            start_time = omp_get_wtime();
+            double pivot = A[pivot_block*block_size+pivot_i][pivot_block*block_size+pivot_i];
+            //Divide left column by pivot
+            for (int left_column_i = pivot_block*block_size+pivot_i; left_column_i < (pivot_block+1)*block_size; left_column_i++){
+                A[left_column_i][pivot_block * block_size + pivot_i] /= pivot;
+            }
+            //Update all remainig values
+            for (int inner_mat_x = pivot_block*block_size+pivot_i+1; inner_mat_x < (pivot_block+1) * block_size; inner_mat_x++){
+                for (int inner_mat_y = pivot_block*block_size+pivot_i+1; inner_mat_y < (pivot_block+1) * block_size; inner_mat_y++){
+                    A[inner_mat_x][inner_mat_y] -= A[inner_mat_x][pivot_block*block_size+pivot_i] * A[pivot_block*block_size+pivot_i][inner_mat_y];
+                }
+            }
+            end_time = omp_get_wtime();
+            pivot_block_time += (end_time-start_time);
+            pivot_block_count++;
+            //For each vertical block under the current pivot block
+            #pragma omp parallel for
+            for(int v_block_i = pivot_block + 1 ; v_block_i < n/block_size;v_block_i ++){
+                start_time = omp_get_wtime();
+                //Divide left column by pivot
+                for (int left_column_i = 0; left_column_i < block_size; left_column_i++){
+                    A[v_block_i*block_size+left_column_i][pivot_block*block_size+pivot_i] /= pivot;
+                }
+                //Update all remainig values
+                for (int inner_mat_x = pivot_block*block_size+pivot_i+1; inner_mat_x < (pivot_block+1) * block_size; inner_mat_x++){
+                    for (int inner_mat_y = v_block_i*block_size; inner_mat_y < (v_block_i+1) * block_size; inner_mat_y++){
+                        A[inner_mat_y][inner_mat_x] -= A[inner_mat_y][pivot_block*block_size+pivot_i] * A[pivot_block*block_size+pivot_i][inner_mat_x];
+                    }
+                }
+                end_time = omp_get_wtime();
+                vertical_block_time += (end_time - start_time);
+                vertical_block_count++;
+            }
+            //For each horizontal block to the right of the pivot block
+            #pragma omp parallel for
+            for(int h_block_i = pivot_block + 1 ; h_block_i < n/block_size;h_block_i ++){
+                start_time = omp_get_wtime();
+                //Update all remainig values
+                for (int inner_mat_x = (h_block_i+pivot_block)*block_size; inner_mat_x < (pivot_block + h_block_i+1) * block_size; inner_mat_x++){
+                    for (int inner_mat_y = pivot_block*block_size+pivot_i+1; inner_mat_y < (pivot_block+1) * block_size; inner_mat_y++){
+                        A[inner_mat_y][inner_mat_x] -= A[inner_mat_y][pivot_block*block_size+pivot_i] * A[pivot_block*block_size+pivot_i][inner_mat_x];
+                    }
+                }
+                
+                end_time = omp_get_wtime();
+                horizontal_block_time += (end_time - start_time);
+                horizontal_block_count++;
+            }
+            //Update other blocks
+            #pragma omp parallel for
+            for(int h_block_i = pivot_block+1;h_block_i < n/block_size;h_block_i ++){
+                for(int v_block_i = pivot_block+1;v_block_i < n/block_size;v_block_i ++){
+                    start_time = omp_get_wtime();
+                    for (int inner_mat_x = (h_block_i)*block_size; inner_mat_x < (h_block_i+1) * block_size; inner_mat_x++){
+                        for (int inner_mat_y = v_block_i*block_size; inner_mat_y < (v_block_i+1) * block_size; inner_mat_y++){
+                            A[inner_mat_y][inner_mat_x] -= A[inner_mat_y][pivot_block*block_size+pivot_i] * A[pivot_block*block_size+pivot_i][inner_mat_x];
+                        }
+                    }
+                    end_time = omp_get_wtime();
+                    rest_block_time += (end_time - start_time);
+                    rest_block_count++;
+                }
+            }
+        }
+    }
+    printf("Average pivot block time:      %f\n",pivot_block_time/pivot_block_count);
+    printf("Average vertical block time:   %f\n",vertical_block_time/vertical_block_count);
+    printf("Average horizontal block time: %f\n",horizontal_block_time/horizontal_block_count);
+    printf("Average rest block time:       %f\n",rest_block_time/rest_block_count);
+}
+
+
+
 void solve_lu(double** A, double* b, double* x, int n) {
     int i, j;
     double sum;
@@ -250,13 +423,71 @@ void sequential_solution(int n) {
     printf("Sequential time for %d: %3.6f\n", n,(double)(toc - tic) / CLOCKS_PER_SEC);
 }
 
+void block_solution(int n, int block_size) {
+
+    clock_t tic, toc;
+
+    double** A = (double**) malloc(n * sizeof(double*));
+    double* b = (double*) malloc(n * sizeof(double));
+    double* x = (double*) malloc(n * sizeof(double));
+
+    for (int i = 0; i < n; i++) {
+        A[i] = (double*) malloc(n * sizeof(double));
+    }
+
+    init_matrix_and_vector(A, b, n);
+
+    tic = clock();
+    
+    // Perform LU factorization
+    block_lu_factorization(A, n, block_size);
+    
+    // Solve for x
+    solve_lu(A, b, x, n);
+
+    toc = clock();
+
+    printf("Block time for %d: %3.6f\n", n,(double)(toc - tic) / CLOCKS_PER_SEC);
+}
+
+void parallel_block_solution(int n,int block_size) {
+
+    double tic, toc;
+
+    double** A = (double**) malloc(n * sizeof(double*));
+    double* b = (double*) malloc(n * sizeof(double));
+    double* x = (double*) malloc(n * sizeof(double));
+
+    for (int i = 0; i < n; i++) {
+        A[i] = (double*) malloc(n * sizeof(double));
+    }
+
+    init_matrix_and_vector(A, b, n);
+
+    tic = omp_get_wtime();
+    
+    // Perform LU factorization
+    parallel_block_lu_factorization(A, n, block_size);
+    
+    // Solve for x
+    solve_lu(A, b, x, n);
+
+    toc = omp_get_wtime();
+
+    printf("Parallel block time for %d: %3.6f\n", n,(toc - tic));
+}
+
 
 int main() {
 
-    /*for (int n = 1024; n <= 8192; n = n + 1024) {
+    for (int n = 1024; n <= 8192; n = n + 1024) {
         sequential_solution(n);
-    }*/
+        block_solution(n, 256);
+        parallel_block_solution(n, 256);
+    }
 
+
+    /* CODE FOR TESTING WITH A 9x9 MATRIX
     int n=9;
     double** A = (double**) malloc(n * sizeof(double*));
     for(int i = 0; i < n; i++){
@@ -266,8 +497,5 @@ int main() {
             //A[i][j] = (double)(1+2*i+j);
         }
     }
-
-    block_lu_factorization(A, n, 3);
-
-    printMatrix(A,n);
+    */
 }
